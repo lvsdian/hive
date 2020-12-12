@@ -467,7 +467,7 @@
     7902    FORD    ANALYST    7566    1981-12-3    3000.00    20
     7934    MILLER    CLERK    7782    1982-1-23    1300.00    10
     ```
-    
+  
 - 创建部门表
   
   ```SPARQL
@@ -477,7 +477,7 @@
         loc int
     )
     row format delimited fields terminated by '\t';
-    ```
+  ```
   
 - 创建员工表
   
@@ -492,7 +492,7 @@
         comm double comment "奖金",
         deptno int comment "部门编号")
         row format delimited fields terminated by '\t';
-    ```
+  ```
   
 - `hive (default)> load data local inpath '/opt/datas/dept.txt' into table dept;`
     `hive (default)> load data local inpath '/opt/datas/emp.txt' into table emp;`
@@ -829,3 +829,371 @@
     hive (default)> select * from emp cluster by deptno;
     hive (default)> select * from emp distribute by deptno sort by;
     ```
+
+### 分区/分桶
+
+#### 分区
+
+- 分区表实际上就是对应一个HDFS文件系统上的独立的文件夹，该文件夹下是该分区所有的数据文件。**Hive中的分区就是分目录**，把一个大的数据集根据业务需要分割成小的数据集。**在查询时通过WHERE子句中的表达式选择查询所需要的指定的分区，这样的查询效率会提高很多。**（分区前查全表，分区后查分区(全表的一部分)，所以效率提高了）
+
+- 分区基本操作
+
+  - 引入分区表（需要根据日期对日志进行管理, 通过部门信息模拟）
+
+    ```
+    dept_20200401.log
+    10 ACCOUNTING 1700
+    20 RESEARCH 1800
+    
+    dept_20200402.log
+    30 SALES 1900
+    40 OPERATIONS 1700
+    
+    dept_20200403.log
+    50 TEST 2000
+    60 DEV 1900
+    ```
+
+  - 创建分区表语法
+
+    分区字段（这里是day）**不能是表中已经存在的字段**，可以将分区字段看作表的伪列。
+
+    ```SPARQL
+    hive (default)> create table dept_par(
+        deptno int, dname string, loc string
+    )
+    partitioned by (day string)
+    row format delimited fields terminated by '\t';
+    ```
+
+  - 加载数据
+
+    分区表加载数据时，必须指定分区（不指定会生成一个默认的分区）
+
+    ```SPARQL
+    hive (default)> load data local inpath
+        '/opt/module/hive/datas/dept1.txt' 
+        into table dept_par
+        partition(day='2020-10-25');
+    
+    hive (default)> load data local inpath
+        '/opt/module/hive/datas/dept2.txt' 
+        into table dept_par
+        partition(day='2020-10-26');
+    
+    hive (default)> load data local inpath
+        '/opt/module/hive/datas/dept3.txt' 
+        into table dept_par
+        partition(day='2020-10-27');
+    ```
+
+  - 查询数据
+
+    ![](img\13.png)
+
+    对于如下两个查询，结果一样，但第一个查询效率高，因为它指定了分区，而第二个查询会全表扫描。
+
+    ![](img\14.png)
+
+  - metastore里的PARTITIONS表就记录了分区信息
+
+  - 分区字段相当于一个伪列，和其他字段放在不同位置（分区字段是目录，其他的字段放在文件里）
+
+    ![](img\15.png)
+
+  - 单分区查询
+
+    ```SPARQL
+    hive (default)> select * from dept_par where day='2020-10-26';
+    ```
+
+  - 多分区联合查询
+
+    ```SPARQL
+    hive (default)> select * from dept_par where day='2020-10-256'
+        union
+        select * from dept_par where day='2020-10-26'
+        union
+        select * from dept_par where day='2020-10-27';
+    
+    hive (default)> select * from dept_par where day='2020-10-25' 
+        or day='2020-10-26' 
+        or day='2020-10-27';
+    ```
+
+  - 增加分区
+
+    ```SPARQL
+    # 增加单个分区
+    hive (default)> alter table dept_par add partition(day='2020-10-28');
+    
+    # 增加多个分区，分区间用空格分隔
+    hive (default)> alter table dept_par add partition(day='2020-10-29')
+        partition(day='2020-10-30;
+    ```
+
+  - 删除分区
+
+    ```SPARQL
+    # 删除单个分区
+    hive (default)> alter table dept_par drop partition
+        (day='2020-10-30');
+    
+    # 删除多个分区，分区间用逗号分隔
+    hive (default)> alter table dept_par drop partition (day='2020-10-39'),
+        partition(day='2020-10-28');
+    ```
+
+  - 查看分区表有多少个分区
+
+    ```SPARQL
+    hive (default)> show partitions dept_par;
+    ```
+
+  - 查看分区表结果
+
+    ```SPARQL
+    hive> desc formatted dept_par;
+    # Partition Information
+    # col_name data_type comment
+    day string
+    ```
+
+- 二级分区
+
+  如何一天的日志数据量也很大，如何再将数据拆分？按小时分...
+
+  - 创建二级分区表
+
+    ```SPARQL
+    hive (default)> create table dept_par2(
+        deptno int, dname string, loc string
+    )
+    partitioned by (day string, hour string)
+    row format delimited fields terminated by '\t';
+    ```
+
+  - 加载数据
+
+    ```SPARQL
+    hive (default)> load data local inpath
+        '/opt/module/hive/datas/dept1.log' 
+        into table dept_par2 
+        partition(day='2020-10-27', hour='11');
+    ```
+
+    ![](img\16.png)
+
+  - 查询分区数据
+
+    ```SPARQL
+    hive (default)> select * from dept_partition2 
+        where day='2020-10-27' and hour='12';
+    ```
+
+    ![](img\17.png)
+
+  - 分区表关联数据的三种方式
+
+    如上“分区基本操作”示例，先创建分区表，再往表里面加载数据，同时指定分区。那么加载的数据(dept1.txt、dept2.txt、dept3.txt三个文件)就按指定的分区位于不同的分区中。
+
+    如果此时手动在`/user/hive/warehouse/dept_par`中创建一个目录`2020-10-29`，再往`2020-10-29`里放一个文件。那么`2020-10-29`是否能被识别成分区？不能，metastore里根本没记录`2020-10-29`。
+
+    对应命令：
+
+    `hadoop fs -mkdir /user/hive/warehouse/dept_par/day=2020-10-29`
+
+    `hadoop fs -put dept4.txt /user/hive/warehouse/dept_par/day=2020-10-29`
+
+    解法方法：
+
+    1. 执行修复命令：`hive (default)> msck repair table dept_par;`
+
+    2. 添加分区：`hive (default)> alter table dept_par add patition(day='2020-10-29');`
+
+    3. 创建文件夹后直接load，不put
+
+       ```SPARQL
+       hive (default)> load data local inpath
+           '/opt/module/hive/datas/dept4.txt' 
+           into table dept_par 
+           partition(day='2020-10-29');
+       ```
+
+- 动态分区调整
+
+  关系型数据库中，对分区表insert数据时候，数据库自动会根据分区字段的值，将数据插入到相应的分区中，Hive 中也提供了类似的机制，即动态分区(Dynamic Partition)，只不过，使用Hive的动态分区，需要进行相应的配置。
+
+  - 开启动态分区参数设置
+
+    1. 开启动态分区功能（默认 true，开启）
+
+       `hive (default)> hive.exec.dynamic.partition=true`
+
+    2. 设置为非严格模式（动态分区的模式，默认 strict，表示必须指定至少一个分区为静态分区，nonstrict 模式表示允许所有的分区字段都可以使用动态分区。）
+
+       `hive (default)> hive.exec.dynamic.partition.mode=nonstrict`
+
+    3. 在所有执行MR的节点上，最大一共可以创建多少个动态分区。默认 1000
+
+       `hive (default)> hive.exec.max.dynamic.partitions=1000`
+
+    4. 在每个执行 MR 的节点上，最大可以创建多少个动态分区。该参数需要根据实际的数据来设定。比如：源数据中包含了一年的数据，即 day 字段有 365 个值，那么该参数就需要设置成大于365，如果使用默认值100，则会报错。
+
+       `hive (default)> hive.exec.max.dynamic.partitions.pernode=100`
+
+    5. 整个MR Job中，最大可以创建多少个HDFS文件。默认 100000
+
+       `hive (default)> hive.exec.max.created.files=100000`
+
+    6. 当有空分区生成时，是否抛出异常。一般不需要设置。默认 false
+
+       `hive (default)> hive.error.on.empty.partition=false`
+
+  - 示例
+
+    创建分区表
+
+    ```SPARQL
+    hive (default)> create table dept_no_par(dname string, loc string)
+        partitioned by (deptno int) 
+        row format delimited fields terminated by '\t';
+    ```
+
+    导入数据
+
+    ```SPARQL
+    # 创建静态分区
+    hive (default)> insert into table dept_no_par partition(deptno='70')
+        select dname, loc from dept;
+    
+    # 创建动态分区，以dept的deptno作为分区
+    # partition内只写分区名，select...的最后一个字段作为分区信息
+    hive (default)> insert into table dept_no_par partition(deptno)
+        select dname, loc, deptno from dept;
+    
+    # 如果不指定"partition(deptno)"，也会用dept表的deptno作为分区信息,hive3新加的功能
+    # 再建个dept_no_par2表
+    hive (default)> create table dept_no_par2(dname string, loc string)
+        partitioned by (deptno int) 
+        row format delimited fields terminated by '\t';
+    # 不指定"partition(deptno)"
+    hive (default)> insert into table dept_no_par2 
+        select dname, loc, deptno from dept;
+    
+    # 即使是在严格模式(strict)下，不指定"partition(deptno)"，也能创建动态分区
+    # 再建个dept_no_par3表
+    hive (default)> create table dept_no_par3(dname string, loc string)
+        partitioned by (deptno int) 
+        row format delimited fields terminated by '\t';
+    # 不指定"partition(deptno)"，在select最后加上动态分区字段，创建动态分区成功
+    hive (default)> insert into table dept_no_par3
+        select dname, loc, deptno from dept;
+    ```
+
+    如下图，分区信息"deptno=10"、"deptno=10"...来自dept表的deptno列
+
+    ![](img\18.png)
+
+#### 分桶
+
+- 分区提供一个隔离数据和优化查询的便利方式。不过，并非所有的数据集都可形成合理的分区。对于一张表或者分区，Hive 可以进一步组织成桶，也就是更为细粒度的数据范围划分。
+
+- 分桶是将数据集分解成更容易管理的若干部分的另一个技术。 
+
+- **分区针对的是数据的存储路径；分桶针对的是数据文件**。
+
+- 创建分桶表
+
+  - 数据准备 student.txt
+
+    ```
+    1001 ss1
+    1002 ss2
+    1003 ss3
+    1004 ss4
+    1005 ss5
+    1006 ss6
+    1007 ss7
+    1008 ss8
+    1009 ss9
+    1010 ss10
+    1011 ss11
+    1012 ss12
+    1013 ss13
+    1014 ss14
+    1015 ss15
+    1016 ss16
+    ```
+
+  - 创建分桶表
+
+    **分桶表用clustered by指定一个表中已有的字段作为分桶字段。**
+
+    对分桶字段的值进行哈希，然后除以桶的个数求余的方 式决定该条记录存放在哪个桶当中
+
+    ```SPARQL
+    hive (default)> create table stu_buck(id int, name string)
+        clustered by(id)
+        into 4 buckets
+        row format delimited fields terminated by '\t';
+    ```
+
+  - 查看表结构
+
+    ```SPARQL
+    hive (default)> desc formatted stu_buck;
+    Num Buckets: 4 
+    Bucket Columns: [id]
+    ```
+
+  - 导入数据到分桶表，load的方式
+
+    ```SPARQL
+    hive (default)> load data inpath '/student.txt' into table stu_buck;
+    ```
+
+    按照id % 4的值，分成了四个桶
+
+    ![](img\19.png)
+    ![](img\20.png)
+
+  - 分桶表注意事项
+
+    1. reduce 的个数设置为-1,让 Job 自行决定需要用多少个 reduce 或者将 reduce 的个数设置为大于等于分桶表的桶数
+    2. 从 hdfs 中 load 数据到分桶表中，避免本地文件找不到问题
+    3. 不要使用本地模式
+
+  - insert方式将数据导入分桶表
+
+    ```SPARQL
+    hive(default)>insert into table stu_buck select * from xxx;
+    ```
+
+- 抽样查询
+
+  - 对于非常大的数据集，有时用户需要使用的是一个具有代表性的查询结果而不是全部结果。Hive 可以通过对表进行抽样来满足这个需求。
+
+  - 语法: `TABLESAMPLE(BUCKET x OUT OF y)`
+
+    y必须是table总bucket数的倍数或者因子。hive根据y的大小，决定抽样的比例。例如，table总共分了64份，当y=32时，抽取(64/32=)2个bucket的数据，当y=128时，抽取(64/128=)1/2个bucket的数据。
+
+     x表示从哪个bucket开始抽取。例如，table总bucket数为32，tablesample(bucket 3 out of 16)，表示总共抽取（32/16=）2个bucket的数据，分别为第3个bucket和第（3+16=）19个bucket的数据。
+
+  - 查询stu_buck中的数据
+
+    ```SPARQL
+    hive (default)> select * from stu_buck 
+        tablesample(bucket 1 out of 4 on id);
+    
+    ```
+
+    注意：x的值必须小于等于y的值，否则
+
+    ```
+    FAILED: SemanticException [Error 10061]: Numerator should not be bigger
+    than denominator in sample clause for table stu_buck
+    ```
+
+    ![](img\21.png)
+
