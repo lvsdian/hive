@@ -1453,3 +1453,521 @@
        ```
 
        ![](img/33.png)
+
+- 窗口函数
+
+  相关函数
+
+  - `OVER()`：指定分析函数工作的数据窗口大小，这个数据窗口大小可能会随着行的变而变化。
+
+  - `CURRENT ROW`：当前行 
+
+  - `n PRECEDING`：往前 n 行数据 
+
+  - `n FOLLOWING`：往后 n 行数据 
+
+  - `UNBOUNDED`：起点
+
+    - `UNBOUNDED PRECEDING` 表示从前面的起点， 
+    - `UNBOUNDED FOLLOWING` 表示到后面的终点
+
+  - `LAG(col,n,default_val)`：往前第 n 行数据 
+
+  - `LEAD(col,n, default_val)`：往后第 n 行数据
+
+  - `NTILE(n)`：把有序窗口的行分发到指定数据的组中，各个组有编号，编号从 1 开始，对于每一行，NTILE 返回此行所属的组的编号。注意：n 必须为 int 类型。
+
+  - 数据准备 business.txt
+
+    ```
+    jack,2017-01-01,10
+    tony,2017-01-02,15
+    jack,2017-02-03,23
+    tony,2017-01-04,29
+    jack,2017-01-05,46
+    jack,2017-04-06,42
+    tony,2017-01-07,50
+    jack,2017-01-08,55
+    mart,2017-04-08,62
+    mart,2017-04-09,68
+    neil,2017-05-10,12
+    mart,2017-04-11,75
+    neil,2017-06-12,80
+    mart,2017-04-13,94
+    ```
+
+  - 创建hive表并导入数据
+
+    ```SPARQL
+    # 一行记录表示哪个人在哪个时间花了多少钱
+    create table business(
+        name string,
+        orderdate string,
+        cost int) 
+    ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+    
+    # 加载数据
+    load data local inpath 
+    "/opt/module/data/business.txt" 
+    into table business;
+    ```
+
+  - 需求
+
+    1. 查询在 2017 年 4 月份购买过的顾客及总人数 
+
+       ![](img\34.png)
+
+       ![](img\35.png)
+
+       `substring(orderdate,0,2)`：表示将orderdate这一列从0位置开始，取两位
+
+       ```SPARQL
+       # distinct的方式，查询在2017年4月份购买过的顾客
+       select 
+           distinct(name)
+       from business
+       where substring(orderdate,0,7) = '2017-04';
+       # group by的方式，查询在2017年4月份购买过的顾客，设这个hql为t1
+       select 
+           name
+       from business
+       where substring(orderdate,0,7) = '2017-04'
+       group by name;
+       
+       # distince方式，查询在2017年4月份购买过的总人数
+       select 
+           count(distinct(name))
+       from business
+       where substring(orderdate,0,7) = '2017-04';
+       # 子查询方式，查询在2017年4月份购买过的总人数,(...)括号内是t1这个hql
+       select 
+           count(*)
+       from 
+           (...)t1;
+       	
+       # 查询在2017年4月份购买过的顾客及总人数 
+       select 
+           name,
+           count(*) over()
+       from business
+       where substring(orderdate,0,7) = '2017-04'
+       group by name;
+       ```
+
+       
+
+       ```SPARQL
+       # 有无over()的区别
+       select name count(*) from business;
+       select name count(*) over() from business;
+       ```
+
+       ![](img\36.png)
+
+       ![](img/37.png)
+
+       ![](img/38.png)
+
+       `group by`是相同的数据只有一个组，而`over()`，假设有5条数据，就有5个组，只不过每个组的数据相同
+
+       `group by`数据与组是多对一的关系，而`over()`是一对一的关系。
+
+       ```SPARQL
+       # 创建一个num表，只有id一列，值分别为1,2,3,4,5
+       # 按id排序，求id的累加和，结果为1,3,6,10,15
+       select id ,sum(id) over(order by id) from num;
+       ```
+
+       ![](img/58.png)
+
+       ![](img/59.png)
+
+       ![](img/60.png)
+
+       ```SPARQL
+       # 如果把数据改为1,2,3,3,4,5
+       # 再按id排序，求id的累加和，结果为1,3,9,9,13,18
+       select id ,sum(id) over(order by id) from num;
+       ```
+
+       ![](img/61.png)
+
+       ![](img/59.png)
+
+       ![](img/62.png)
+
+    2. 查询顾客的购买明细及月购买总额 
+
+       ```SPARQL
+       # over()效果
+       # 查询顾客的购买明细及购买总额 
+       select name orderdate, cost, sum(cost) 
+       over() 
+       from business;
+       ```
+
+       ![](img/39.png)
+
+       ![](img/40.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name)，范围限定到name
+       # 查询顾客的购买明细及顾客购买总额 
+       select name orderdate, cost, sum(cost) 
+       over(partition by name) 
+       from business;
+       ```
+
+       ![](img/41.png)
+
+       ![](img/42.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name, month(orderdate))，范围限定到name,month
+       # 查询顾客的购买明细及顾客月购买总额 
+       select name orderdate, cost, sum(cost) 
+       over(partition by name, month(orderdate)) 
+       from business;
+       ```
+
+       ![](img/43.png)
+
+       ![](img/44.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name, month(orderdate))，范围限定到name,month
+       # 查询顾客的购买明细及月购买总额 
+       select name orderdate, cost, sum(cost) 
+       over(partition by month(orderdate)) 
+       from business;
+       ```
+
+       ![](img/45.png)
+
+       ![](img/47.png)
+
+    3. 上述的场景, 将每个顾客的 cost 按照日期进行累加 
+
+       因为是求“每个顾客”，所以一定有`partition by name`
+
+       ```SPARQL
+       # over(partition by name order by orderdate)，范围限定到name
+       # 查询顾客的购买明细，按月份排序，按name进行累加
+       select name orderdate, cost, sum(cost) 
+       over(partition by name order by orderdate) 
+       from business;
+       ```
+
+       ![](img/48.png)
+
+       ![](img/49.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name order by orderdate rows between unbounded preceding 
+       # and current row)
+       # 查询顾客的购买明细，按月份排序，按name进行累计，并指定窗口范围，从 unbounded preceding
+       # 到 current row，即从前面的起点到当前行
+       select name orderdate, cost, sum(cost) 
+       over(partition by name order by orderdate rows between unbounded preceding 
+           and current row) 
+       from business;
+       ```
+
+       ![](img/50.png)
+
+       ![](img/51.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name order by orderdate rows between 1 preceding and
+       # 1 following)
+       # 查询顾客的购买明细，按月份排序，按name进行累计，并指定窗口范围，从 1 preceding
+       # 到 1 following，即从前1行数据到后1行数据
+       # 每个sum都是前一行、当前行、后一行的和，如果这三个中某个没有，就当做0
+       select name orderdate, cost, sum(cost) 
+       over(partition by name order by orderdate rows between 1 preceding and 
+           1 following) 
+       from business;
+       ```
+
+       ![](img/52.png)
+
+       ![](img/53.png)
+
+       
+
+       ```SPARQL
+       # over(partition by name order by orderdate rows between unbounded preceding  
+       # and 1 preceding)
+       # 查询顾客的购买明细，按月份排序，按name进行累计，并指定窗口范围，从 unbounded preceding
+       # 到 1 preceding，即从前面的起点到前1行数据
+       # 每个sum都是前面的起点到前1行数据的和，如此，按name分的每个区，第一行都为NULL,因为起点
+       # 是它本身，终点是它的前一行，第二行都等于第一行的cost，因为起点、终点都是这个区的第一行
+       select name orderdate, cost, sum(cost) 
+       over(partition by name order by orderdate rows between 1 preceding and 
+           1 following) 
+       from business;
+       ```
+
+       ![](img/54.png)
+
+       ![](img/55.png)
+
+       
+
+       ```SPARQL
+       # over(order by orderdate)
+       # 查询顾客的购买明细，按月份排序，做累加
+       select name orderdate, cost, sum(cost) 
+       over(order by orderdate) 
+       from business;
+       ```
+
+       ![](img/56.png)
+
+       ![](img/57.png)
+
+    4. 查询每个顾客上次的购买时间 
+
+       ```SPARQL
+       # 查询顾客的购买明细，按月份排序，按name分区
+       # 求上次购买时间
+       select name,orderdate
+       lag(orderdate, 1) 
+       over(partition by name order by orderdate)
+       from business;
+       ```
+
+       ![](img/63.png)
+
+       ![](img/64.png)
+
+       
+
+       ```SPARQL
+       # 查询顾客的购买明细，按月份排序，按name分区
+       # 求上次购买时间，如果为空，设置默认值1970-01-01
+       select name,orderdate
+       lag(orderdate, 1, '1970-01-01') 
+       over(partition by name order by orderdate)
+       from business;
+       ```
+
+       ![](img/65.png)
+
+       ![](img/66.png)
+
+       
+
+       ```SPARQL
+       # 查询顾客的购买明细，按月份排序，按name分区
+       # 求下次购买时间，如果为空，设置为当月时间
+       select name,orderdate
+       lead(orderdate, 1, orderdate) 
+       over(partition by name order by orderdate)
+       from business;
+       ```
+
+       ![](img/67.png)
+
+       ![](img/68.png)
+
+    5. 查询前20%时间的订单信息
+
+       ```SPARQL
+       # 查询顾客的购买明细，按月份排序，分成5个组，groupId是每个组编号
+       # 以下hql结果集设为t1表，20%时间的订单信息则取groupId=1的即可
+       select name, orderdate, cost,
+       ntile(5) over(order by orderdate) groupId
+       from business;
+       ```
+
+       ![](img/69.png)
+
+       ![](img/70.png)
+
+       
+
+       ```SPARQL
+       # 取以上数据中groupId=1的数据，即前20%时间的数据
+       select name, orderdate, cost
+       from 
+           (...)t1
+       where groupId = 1;
+       ```
+
+       ![](img/71.png)
+
+       ![](img/72.png)
+
+- Rank
+
+  相关函数
+
+  - `RANK()`：排序相同时会重复，总数不会变
+
+  - `DENSE_RANK()` ：排序相同时会重复，总数会减少
+
+  - `ROW_NUMBER() `：会根据顺序计算
+
+  - 数据准备 score.txt
+
+    ```
+    孙悟空 语文 87
+    孙悟空 数学 95
+    孙悟空 英语 68
+    大海 语文 94
+    大海 数学 56
+    大海 英语 84
+    宋宋 语文 64
+    宋宋 数学 86
+    宋宋 英语 84
+    婷婷 语文 65
+    婷婷 数学 85
+    婷婷 英语 78
+    ```
+
+  - 创建表并导入数据
+
+    ```SPARQL
+    create table score(
+        name string,
+        subject string,
+        score int)
+    row format delimited fields terminated by "\t";
+    
+    # 导入数据
+    load data local inpath 
+    '/opt/module/data/score.txt' 
+    into table score;
+    ```
+
+  - 需求
+
+    ```SPARQL
+    # 查询学生信息，按照score进行排序
+    # 使用rand()，第六名重复了，但总数还是12，没变
+    select *, 
+        rank(), over(order by score) 
+    from score;
+    ```
+
+    ![](img/73.png)
+
+    ![](img/74.png)
+
+    
+
+    ```SPARQL
+    # 查询学生信息，按照score进行排序
+    # 使用dense_rand()，第六名重复了，总数变为11，减少了
+    select *, 
+        dense_rank(), over(order by score) 
+    from score;
+    ```
+
+    ![](img/75.png)
+
+    ![](img/76.png)
+
+    
+
+    ```SPARQL
+    # 查询学生信息，按学科分区，再按照score进行排序
+    select *, 
+        rank(), over(partition by subject order by score) 
+    from score;
+    ```
+
+    ![](img/77.png)
+
+    ![](img/78.png)
+
+    
+
+    ```SPARQL
+    # 求每个学科的前三名
+    select name, subject, score
+    from 
+        (select 
+            *,
+            rank() over(partition by subject order by score desc) rk
+         from score) t1
+    where rk <= 3;
+    ```
+
+    ![](img/79.png)
+
+- 自定义函数
+
+  [官网](https://cwiki.apache.org/confluence/display/Hive/HivePlugins)
+
+  步骤
+
+  1. 继承Hive提供的类
+
+     `org.apache.hadoop.hive.ql.udf.generic.GenericUDF;`
+
+     `org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;`
+
+  2. 实现抽象方法
+
+  3. 在hive的命令行窗口创建函数
+
+     添加jar：`add jar 【linux_jar_path】`
+
+     创建：`create [temporary] function [dbname.]function_name AS class_name;`
+
+  4. 在hive命令行使用自定义函数
+
+### 压缩
+
+- 压缩技术能够有效减少底层存储系统（HDFS）读写字节数。压缩提高了网络带宽和磁盘空间的效率。在Hadoop下，尤其是数据规模很大和工作负载密集的情况下，使用数据压缩显得非常重要。在这种情况下，I/O操作和网络数据传输要花大量的时间。还有，Shuffle与Merge过程同样也面临着巨大的I/O压力。鉴于磁盘I/O和网络带宽是Hadoop的宝贵资源，数据压缩对于节省资源、最小化磁盘I/O和网络传输非常有帮助。不过，尽管压缩与解压操作的CPU开销不高，其性能的提升和资源的节省并非没有代价。如果磁盘I/O和网络带宽影响了MapReduce作业性能，在任意MapReduce阶段启用压缩都可以改善端到端处理时间并减少I/O和网络流量。
+- 压缩Mapreduce的一种优化策略：通过压缩编码对Mapper或者Reducer的输出进行压缩，以减少磁盘IO，提高MR程序运行速度（但相应增加了cpu运算负担）。
+- 注意：压缩特性运用得当能提高性能，但运用不当也可能降低性能。
+- 基本原则：
+  1. 运算密集型的job，少用压缩
+  2. IO密集型的job，多用压缩
+
+#### Hadoop压缩配置
+
+- MR支持的压缩编码
+
+  | 压缩格式 | hadoop自带？ | 算法    | 文件扩展名 | 是否可切分 | 换成压缩格式后，原来的程序是否需要修改 |
+  | -------- | ------------ | ------- | ---------- | ---------- | -------------------------------------- |
+  | DEFAULT  | 是，直接使用 | DEFAULT | .default   | 否         | 和文本处理一样，不需要修改             |
+  | Gzip     | 是，直接使用 | DEFAULT | .gz        | 否         | 和文本处理一样，不需要修改             |
+  | bzip2    | 是，直接使用 | bzip2   | .bz2       | 是         | 和文本处理一样，不需要修改             |
+  | LZO      | 否，需要安装 | LZO     | .lzo       | 是         | 需要建索引，还需要指定输入格式         |
+  | Snappy   | 否，需要安装 | Snappy  | .snappy    | 否         | 和文本处理一样，不需要修改             |
+
+- 为了支持多种压缩/解压缩算法，Hadoop引入了编码/解码器，如下表所示
+
+  | 压缩格式 | 对应的编码/解码器                          |
+  | -------- | ------------------------------------------ |
+  | DEFLATE  | org.apache.hadoop.io.compress.DefaultCodec |
+  | gzip     | org.apache.hadoop.io.compress.GzipCodec    |
+  | bzip2    | org.apache.hadoop.io.compress.BZip2Codec   |
+  | LZO      | com.hadoop.compression.lzo.LzopCodec       |
+  | Snappy   | org.apache.hadoop.io.compress.SnappyCodec  |
+
+- 压缩性能的比较
+
+  | 压缩算法 | 原始文件大小 | 压缩文件大小 | 压缩速度 | 解压速度 |
+  | -------- | ------------ | ------------ | -------- | -------- |
+  | gzip     | 8.3GB        | 1.8GB        | 17.5MB/s | 58MB/s   |
+  | bzip2    | 8.3GB        | 1.1GB        | 2.4MB/s  | 9.5MB/s  |
+  | LZO      | 8.3GB        | 2.9GB        | 49.3MB/s | 74.6MB/s |
+
+
+
