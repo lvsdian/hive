@@ -4,7 +4,7 @@
 
 - facebook开源的**海量结构化日志**的数据统计，是基于Hadoop的一个**数据仓库工具**，可以将**结构化的数据映射为一张表**，并提供**类SQL**查询功能。**本质：将HQL转化为MapReduce程序**。
 
-  ![](img\1.png)
+  ![](img/1.png)
 
   1. hive处理的数据存储在hdfs上
   2. hive分析数据底层的实现是MapReduce
@@ -26,7 +26,7 @@
 
 - 架构
 
-  ![](img\2.png)
+  ![](img/2.png)
 
   - CLI：用户接口
   - 元数据(Meta store)：包括表名、表所属的数据库(默认是default)、表的拥有者、列/分区字段、表的类型(是否外部表)、表的数据所在目录等：**默认存储在自带的derby数据库中，推荐使用MySQL存储Metastore**。
@@ -36,7 +36,7 @@
     - 优化器：对逻辑执行计划进行优化。 
     - 执行器：把逻辑执行计划转换成可以运行的物理计划。对于 Hive 来 说，就是 MR/Spark。
 
-  ![](img\3.png)
+  ![](img/3.png)
 
 ### 数据类型
 
@@ -587,7 +587,7 @@
 
 #### join
 
-​		![](img\4.png)
+​		![](img/4.png)
 
 - 内连接
 
@@ -742,7 +742,7 @@
 
     按部门编号，分成三个区(因为reduce被设为3)，每个区内降序，但这种并不知道是按什么进行分区的，只知道被分成了三个区：
 
-    ![](img\5.png)
+    ![](img/5.png)
 
   - 将结果导入文件中（按部门编号降序查看员工信息）
 
@@ -754,11 +754,11 @@
 
     生成了三个文件：
 
-    ![](img\6.png)
+    ![](img/6.png)
 
     每个文件内容：
 
-    ![](img\7.png)
+    ![](img/7.png)
 
 - 分区（Distribute By）
 
@@ -778,7 +778,7 @@
 
     结果：
 
-    ![](img\8.png)
+    ![](img/8.png)
 
     ```SPARQL
     hive (default)> set mapreduce.job.reduces=4;
@@ -787,7 +787,7 @@
 
     结果（将deptno % 4，只有两个结果，所以只有两个区）：
 
-    ![](img\9.png)
+    ![](img/9.png)
 
      ```SPARQL
     hive (default)> set mapreduce.job.reduces=4;
@@ -799,11 +799,11 @@
 
     分成四个区，（将deptno % 4，只有两个结果，所以只有两个区有数据，另外两个区是空的）：
 
-    ![](img\10.png)
+    ![](img/10.png)
 
     分区内容：
 
-    ![](img\11.png)
+    ![](img/11.png)
 
     ```SPARQL
     hive (default)> set mapreduce.job.reduces=4;
@@ -815,7 +815,7 @@
 
     结果：
 
-    ![](img\12.png)
+    ![](img/12.png)
 
 - Cluster By
 
@@ -889,17 +889,17 @@
 
   - 查询数据
 
-    ![](img\13.png)
+    ![](img/13.png)
 
     对于如下两个查询，结果一样，但第一个查询效率高，因为它指定了分区，而第二个查询会全表扫描。
 
-    ![](img\14.png)
+    ![](img/14.png)
 
   - metastore里的PARTITIONS表就记录了分区信息
 
   - 分区字段相当于一个伪列，和其他字段放在不同位置（分区字段是目录，其他的字段放在文件里）
 
-    ![](img\15.png)
+    ![](img/15.png)
 
   - 单分区查询
 
@@ -982,7 +982,7 @@
         partition(day='2020-10-27', hour='11');
     ```
 
-    ![](img\16.png)
+    ![](img/16.png)
 
   - 查询分区数据
 
@@ -991,7 +991,7 @@
         where day='2020-10-27' and hour='12';
     ```
 
-    ![](img\17.png)
+    ![](img/17.png)
 
   - 分区表关联数据的三种方式
 
@@ -1093,7 +1093,7 @@
 
     如下图，分区信息"deptno=10"、"deptno=10"...来自dept表的deptno列
 
-    ![](img\18.png)
+    ![](img/18.png)
 
 #### 分桶
 
@@ -1155,8 +1155,8 @@
 
     按照id % 4的值，分成了四个桶
 
-    ![](img\19.png)
-    ![](img\20.png)
+    ![](img/19.png)
+    ![](img/20.png)
 
   - 分桶表注意事项
 
@@ -1195,5 +1195,261 @@
     than denominator in sample clause for table stu_buck
     ```
 
-    ![](img\21.png)
+    ![](img/21.png)
 
+### 函数
+
+- 查看系统内置函数：`hive> show functions;`
+
+- 显示自带函数的用法：`hive> desc function upper;`
+
+  ![](img/22.png)
+
+- 详细显示自带函数的用法：`hive> desc function extended upper;`
+
+  ![](img/23.png)
+
+- hive中的函数分三种，
+
+  - UDF：一进一出
+
+  - UDAF：多进一出
+
+  - UDTF：一进多出
+
+    多：指输入数据的函数
+
+    ![](img/24.png)
+
+- 如果员工comm为NULL，就用-1代替
+
+  ![](img/25.png)
+
+- CASE、WHEN、THEN、ELSE、END
+
+  - 数据准备 emp_sex.txt
+
+    ```
+    悟空    A    男
+    大海    A    男
+    宋宋    B    男
+    凤姐    A    女
+    婷姐    B    女
+    婷婷    B    女
+    ```
+
+  - 建表
+
+    ```SPARQL
+    create table emp_sex(
+        name string,
+        dept_id string,
+        sex string)
+    row format delimited fields terminated by "\t";
+    
+    # 加载数据
+    load data local inpath 
+    '/opt/module/hive/data/emp_sex.txt' 
+    into table emp_sex;
+    ```
+
+  - 需求
+
+    求出不同部门男女各多少人
+
+    ```
+    dept_Id 男 女
+    A 2 1
+    B 1 2
+    ```
+
+    
+
+    ```SPARQL
+    select
+        dept_id,
+        sum(case sex when '男' then 1 else 0 end) male_count,
+        sum(case sex when '女' then 1 else 0 end) female_count
+    from 
+        emp_sex
+    group by dept_id;
+    
+    # if后第一个表达式为true，就去第二个值，否则取第三个值
+    select
+        dept_id,
+        sum(if(sex='男',1,0)) male_count,
+        sum(if(sex='女',1,0)) female_count
+    from 
+        emp_sex
+    group by dept_id;
+    ```
+
+- 行转列
+
+  相关函数：
+
+  - `CONCAT(string A/col, string B/col…)`
+    - 返回输入字符串连接后的结果，支持任意个输入字符串;
+
+      ![](img/26.png)
+
+  - `CONCAT_WS(separator, str1, str2,...)`
+
+    - 它是一个特殊形式的 `CONCAT()`。第一个参数剩余参数间的分隔符。分隔符可以是与剩余参数一样的字符串。如果分隔符是 NULL，返回值也将为 NULL。这个函数会跳过分隔符参数后的任何 NULL 和空字符串。分隔符将被加到被连接的字符串之间;
+
+      ![](img/27.png)
+
+      ![](img/28.png)
+
+    -  `CONCAT_WS must be "string or array<string>`
+
+  - `COLLECT_SET(col)`/`COLLECT_LIST(col)`
+
+    - 函数只接受基本数据类型，它的主要作用是将某字段的值进行去重汇总，产生 Array 类型字段。
+
+  - 数据准备 person_info.txt
+
+    ```
+    孙悟空	白羊座 A
+    大海 射手座 A
+    宋宋 白羊座 B
+    猪八戒 白羊座 A
+    凤姐 射手座 A
+    苍老师 白羊座 B
+    ```
+
+  - 创建表并导入数据
+
+    ```SPARQL
+    create table person_info(
+        name string,
+        constellation string,
+        blood_type string)
+    row format delimited fields terminated by "\t";
+    
+    # 导入数据
+    load data local inpath 
+    "/opt/module/hive/data/person_info.txt" 
+    into table person_info;
+    ```
+
+  - 需求：把星座和血型一样的人归类到一起。
+
+    ```
+    射手座,A    大海|凤姐
+    白羊座,A    孙悟空|猪八戒
+    白羊座,B    宋宋|苍老师
+    ```
+
+    
+
+    ```SPARQL
+    # 1. 将星座和血型拼接在一起
+    select 
+        concat(constellation, ',', blood_type) con_blood,
+        name
+    from person_info; 
+    
+    # 以上表作为t1表，得到如下结果
+    con_blood    name
+    白羊座,A    孙悟空
+    射手座,A    大海
+    白羊座,B    宋宋
+    白羊座,A    猪八戒
+    射手座,A    凤姐
+    白羊座,B    苍老师
+    ```
+
+    ```SPARQL
+    # 2. 聚合相同星座血型人的姓名
+    # (...)-->把t1表拿过来即可满足需求
+    select 
+        con_blood,
+        concat_ws('|', collect_set(name))
+    from
+        (...)t1
+    group by  con_blood
+    ```
+
+- 列转行
+
+  函数说明
+
+  - `EXPLODE(col)`
+
+    - 将 hive 一列中复杂的 Array 或者 Map 结构拆分成多行。
+
+      ![](img/29.png)
+
+  - `LATERAL VIEW`
+
+    - 用于和split, explode等UDTF一起使用，它能够将一列数据拆成多行数据，在此基础上可以对拆分后的数据进行聚合。
+
+  - 数据准备 movie.txt
+
+    ```
+    《疑犯追踪》    悬疑,动作,科幻,剧情
+    《Lie to me》    悬疑,警匪,动作,心理,剧情
+    《战狼 2》    战争,动作,灾难
+    ```
+
+  - 创建表导入数据
+
+    ```SPARQL
+    create table movie_info(
+     movie string,
+     category string)
+    row format delimited fields terminated by "\t";
+    
+    # 导入数据
+    load data local inpath 
+    "/opt/module/data/movie.txt" 
+    into table movie_info;
+    ```
+
+  - 需求：将电影分类中的数组数据展开。
+
+    ```
+    《疑犯追踪》 悬疑
+    《疑犯追踪》 动作
+    《疑犯追踪》 科幻
+    《疑犯追踪》 剧情
+    《Lie to me》 悬疑
+    《Lie to me》 警匪
+    《Lie to me》 动作
+    《Lie to me》 心理
+    《Lie to me》 剧情
+    《战狼 2》 战争
+    《战狼 2》 动作
+    《战狼 2》 灾难
+    ```
+
+    
+
+    1. 用split函数分割
+
+       ![](img/30.png)
+
+    2. 用explode将split的结果拆分
+
+       ![](img/31.png)
+
+    3. 结果explode拆分结果加上name列
+
+       报错，因为movie列只有三条记录，而category经过split、explode远超三条记录
+
+       ![](img/32.png)
+
+    4. 通过lateral view完成需求
+
+       ```SPARQL
+       SELECT
+           movie,
+           category_name
+       FROM
+           movie_info
+       lateral VIEW
+           explode(split(category,",")) movie_info_tmp AS category_name;
+       ```
+
+       ![](img/33.png)
